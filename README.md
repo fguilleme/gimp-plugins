@@ -11,7 +11,7 @@ But before you need to create the sparkles brush. It can be done easily with a d
 
 
 *BEFORE*
-![After](https://github.com/fguilleme/astro-stars/blob/42bd043e84951b138a66b5698aecf0c694ddddc0/original.jpg)
+![After](https://github.com/fguilleme/astro-stars/blob/c99c29002d5a338417f524eca93ad95cf6e45581/original.jpg)
 
 *AFTER*
 ![After](https://github.com/fguilleme/astro-stars/blob/42bd043e84951b138a66b5698aecf0c694ddddc0/star-sparkles.jpg)
