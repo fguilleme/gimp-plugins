@@ -75,6 +75,7 @@ def create_sparkles(procedure, run_mode, image, n_drawables, drawables, args, da
     fwhm  = config.get_property('fwhm')
     count = config.get_property('count')
     angle = config.get_property('angle')
+    size = config.get_property('size')
 
     Gimp.context_push()
     image.undo_group_start()
@@ -104,12 +105,13 @@ def create_sparkles(procedure, run_mode, image, n_drawables, drawables, args, da
         biggest = max([s[2] for s in stars])
         for x,y,flux in stars:
             Gimp.progress_pulse()
-            # Gimp.context_set_brush('sparkle')
-            size = flux/biggest
-            Gimp.context_set_brush_size(200*size)
-            Gimp.context_set_opacity(size*100)
+            Gimp.context_set_brush('sparkle')
+            ratio = flux/biggest
+            Gimp.context_set_brush_size(ratio*size)
+            Gimp.context_set_opacity(ratio*100)
             Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL)
             Gimp.context_set_brush_angle(angle)
+            Gimp.context_set_background(Gimp.RGB())
             try:
                 rgb = unpack('4f', tmp.get_pixel(int(x) , int(y)))
             except:
@@ -120,6 +122,9 @@ def create_sparkles(procedure, run_mode, image, n_drawables, drawables, args, da
             _color.set(rgb[0], rgb[1], rgb[2])
             Gimp.context_set_foreground(_color)
             Gimp.paintbrush_default(sparkles, [x, y])
+
+        mask = sparkles.create_mask(Gimp.AddMaskType.COPY)
+        sparkles.add_mask(mask)
 
     Gimp.displays_flush()
 
@@ -157,6 +162,11 @@ class Sparkles (Gimp.PlugIn):
                     _("angle"),
                     1, 360, 10,
                     GObject.ParamFlags.READWRITE),
+        "size": (int,
+                    _("Size"),
+                    _("size"),
+                    10, 1000, 100,
+                    GObject.ParamFlags.READWRITE),
     }
     ## GimpPlugIn virtual methods ##
     def do_set_i18n(self, procname):
@@ -185,6 +195,7 @@ class Sparkles (Gimp.PlugIn):
         procedure.add_argument_from_property(self, "fwhm")
         procedure.add_argument_from_property(self, "count")
         procedure.add_argument_from_property(self, "angle")
+        procedure.add_argument_from_property(self, "size")
         return procedure
 
 Gimp.main(Sparkles.__gtype__, sys.argv)
