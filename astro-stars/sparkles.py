@@ -1,4 +1,10 @@
 import sys
+import os
+
+# hack to grab PYTHONPATH from .config/GIMP/2.99/environ/python.env
+if 'PYTHONPATH' in os.environ:
+    sys.path.insert(0, os.environ['PYTHONPATH'])
+
 import numpy as np
 from PIL import Image
 

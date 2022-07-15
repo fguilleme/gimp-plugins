@@ -105,7 +105,7 @@ def create_sparkles(procedure, run_mode, image, n_drawables, drawables, args, da
         biggest = max([s[2] for s in stars])
         for x,y,flux in stars:
             Gimp.progress_pulse()
-            Gimp.context_set_brush('sparkle')
+            # Gimp.context_set_brush('sparkle')
             ratio = flux/biggest
             Gimp.context_set_brush_size(ratio*size)
             Gimp.context_set_opacity(ratio*100)
