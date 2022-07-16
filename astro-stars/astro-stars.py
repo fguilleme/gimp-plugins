@@ -27,7 +27,7 @@ import time
 import sys, os
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/../')
-from bsz_gimp_lib import PlugIn, ParamCombo, ParamString, ParamNumber
+from bsz_gimp_lib import PlugIn, ParamCombo, ParamString, ParamNumber, ParamBool
 
 from sparkles import *
 
@@ -56,8 +56,8 @@ def save_image(image, drawable, file_path):
         ],
     )
 
-def create_sparkles(image, drawable, name, fwhm, count, angle, size):
-    Gimp.context_push()
+def create_sparkles(image, drawable, name, fwhm, count, angle, size, max_opacity, th, sigma, acc):
+    # Gimp.context_push()
     image.undo_group_start()
     Gimp.progress_init('Detect stars...')
 
@@ -73,7 +73,9 @@ def create_sparkles(image, drawable, name, fwhm, count, angle, size):
                          tmp.get_width(), tmp.get_height(),
                          type, 10,
                          Gimp.LayerMode.NORMAL)
+        sparkles.fill(Gimp.FillType.TRANSPARENT)
         image.insert_layer(sparkles, None, 0)
+    if not acc:
         sparkles.fill(Gimp.FillType.TRANSPARENT)
 
     Gimp.progress_pulse()
@@ -81,14 +83,24 @@ def create_sparkles(image, drawable, name, fwhm, count, angle, size):
     path = '/tmp/sparkles.png'
     save_image(image, tmp, path)
 
-    stars = detect_stars(path, count=count, fwhm=fwhm)
+    stars = detect_stars(path, count=count, fwhm=fwhm, sigma=sigma, th=th)
+    smallest = min([s[2] for s in stars])
     biggest = max([s[2] for s in stars])
-    for x,y,flux in stars:
+    print(smallest, biggest)
+    for x, y, flux in stars:
         Gimp.progress_pulse()
-        # Gimp.context_set_brush('sparkle')
-        ratio = flux/biggest
-        Gimp.context_set_brush_size(ratio*size)
-        Gimp.context_set_opacity(ratio*100)
+        rc=Gimp.context_set_brush('sparkle')
+        if flux == smallest:
+            bsize = 1
+            opacity = 1
+        else:
+            ratio = (2*(flux-smallest) / (biggest-smallest))**2
+            bsize = int(ratio*size/2)
+            if bsize == 0:
+                bsize = 1
+            opacity = max(1, min(max_opacity, int(ratio * max_opacity)))
+        Gimp.context_set_brush_size(bsize)
+        Gimp.context_set_opacity(opacity)
         Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL)
         Gimp.context_set_brush_angle(angle)
         Gimp.context_set_background(Gimp.RGB())
@@ -108,17 +120,21 @@ def create_sparkles(image, drawable, name, fwhm, count, angle, size):
 
     Gimp.progress_end()
     image.undo_group_end()
-    Gimp.context_pop()
+    # Gimp.context_pop()
 
 # create the plugin from bsz_gimp_lib
 plugin = PlugIn(
     "Star sparkles",  # name
     create_sparkles,
     ParamString("Layer name", "sparkles"),
-    ParamNumber("FWMH", 1, 1, 30, ui_step=0.5),
-    ParamNumber("Count", 50, 10, 2000, ui_step=10),
-    ParamNumber("Angle", 30, 0, 180, ui_step=5),
-    ParamNumber("Size", 100, 10, 1000, ui_step=5),
+    ParamNumber("FWMH", 7, 1, 30, ui_step=0.5),
+    ParamNumber("Count", 500, 10, 2000, ui_step=10),
+    ParamNumber("Angle", 35, 0, 180, ui_step=5),
+    ParamNumber("Size", 50, 10, 1000, ui_step=5),
+    ParamNumber("Max opacity", 20, 10, 100, ui_step=1),
+    ParamNumber("Threshold", 1, 1, 15, ui_step=1),
+    ParamNumber("Sigma", 2, 1, 5, ui_step=1),
+    ParamBool("Accumulative", True),
     description="Add star sparkles",
     images="RGB*, GRAY*",
     path = "<Image>/Astro/",
