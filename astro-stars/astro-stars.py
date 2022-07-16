@@ -24,11 +24,12 @@ from gi.repository import GObject
 from gi.repository import GLib
 from gi.repository import Gio
 import time
-import sys
-from sparkles import *
+import sys, os
 
-def N_(message): return message
-def _(message): return GLib.dgettext(None, message)
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/../')
+from bsz_gimp_lib import PlugIn, ParamCombo, ParamString, ParamNumber
+
+from sparkles import *
 
 def save_image(image, drawable, file_path):
     interlace, compression = 0, 2
@@ -55,28 +56,7 @@ def save_image(image, drawable, file_path):
         ],
     )
 
-def create_sparkles(procedure, run_mode, image, n_drawables, drawables, args, data):
-    config = procedure.create_config()
-    config.begin_run(image, run_mode, args)
-
-    if run_mode == Gimp.RunMode.INTERACTIVE:
-        GimpUi.init('astro-star-sparkles')
-        dialog = GimpUi.ProcedureDialog(procedure=procedure, config=config)
-        dialog.fill(None)
-        if not dialog.run():
-            dialog.destroy()
-            config.end_run(Gimp.PDBStatusType.CANCEL)
-            return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
-        else:
-            dialog.destroy()
-
-    # color      = config.get_property('color')
-    name  = config.get_property('name')
-    fwhm  = config.get_property('fwhm')
-    count = config.get_property('count')
-    angle = config.get_property('angle')
-    size = config.get_property('size')
-
+def create_sparkles(image, drawable, name, fwhm, count, angle, size):
     Gimp.context_push()
     image.undo_group_start()
     Gimp.progress_init('Detect stars...')
@@ -85,117 +65,65 @@ def create_sparkles(procedure, run_mode, image, n_drawables, drawables, args, da
         type = Gimp.ImageType.RGBA_IMAGE
     else:
         type = Gimp.ImageType.GRAYA_IMAGE
-    for drawable in drawables:
-        tmp = Gimp.Layer.new_from_visible(image, image, name)
+    tmp = Gimp.Layer.new_from_visible(image, image, name)
 
+    sparkles = image.get_layer_by_name(name)
+    if sparkles is None:
         sparkles = Gimp.Layer.new(image, name,
-                             tmp.get_width(), tmp.get_height(),
-                             type, 20,
-                             Gimp.LayerMode.NORMAL)
+                         tmp.get_width(), tmp.get_height(),
+                         type, 10,
+                         Gimp.LayerMode.NORMAL)
+        image.insert_layer(sparkles, None, 0)
         sparkles.fill(Gimp.FillType.TRANSPARENT)
-        image.insert_layer(sparkles, drawable.get_parent(),
-                           image.get_item_position(drawable))
 
+    Gimp.progress_pulse()
+    # save layer as an image
+    path = '/tmp/sparkles.png'
+    save_image(image, tmp, path)
+
+    stars = detect_stars(path, count=count, fwhm=fwhm)
+    biggest = max([s[2] for s in stars])
+    for x,y,flux in stars:
         Gimp.progress_pulse()
-        # save layer as an image
-        path = '/tmp/sparkles.png'
-        save_image(image, tmp, path)
+        # Gimp.context_set_brush('sparkle')
+        ratio = flux/biggest
+        Gimp.context_set_brush_size(ratio*size)
+        Gimp.context_set_opacity(ratio*100)
+        Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL)
+        Gimp.context_set_brush_angle(angle)
+        Gimp.context_set_background(Gimp.RGB())
+        try:
+            rgb = unpack('4f', tmp.get_pixel(int(x) , int(y)))
+        except:
+            # PNG files
+            rgb = [1,1,1,1]
 
-        stars = detect_stars(path, count=count, fwhm=fwhm)
-        biggest = max([s[2] for s in stars])
-        for x,y,flux in stars:
-            Gimp.progress_pulse()
-            # Gimp.context_set_brush('sparkle')
-            ratio = flux/biggest
-            Gimp.context_set_brush_size(ratio*size)
-            Gimp.context_set_opacity(ratio*100)
-            Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL)
-            Gimp.context_set_brush_angle(angle)
-            Gimp.context_set_background(Gimp.RGB())
-            try:
-                rgb = unpack('4f', tmp.get_pixel(int(x) , int(y)))
-            except:
-                # PNG files
-                rgb = [1,1,1,1]
+        _color = Gimp.RGB()
+        _color.set(rgb[0], rgb[1], rgb[2])
+        Gimp.context_set_foreground(_color)
+        Gimp.paintbrush_default(sparkles, [x, y])
 
-            _color = Gimp.RGB()
-            _color.set(rgb[0], rgb[1], rgb[2])
-            Gimp.context_set_foreground(_color)
-            Gimp.paintbrush_default(sparkles, [x, y])
-
-        mask = sparkles.create_mask(Gimp.AddMaskType.COPY)
-        sparkles.add_mask(mask)
-
+    # drawable.update(x, y, width, height)
     Gimp.displays_flush()
 
     Gimp.progress_end()
     image.undo_group_end()
     Gimp.context_pop()
 
-    config.end_run(Gimp.PDBStatusType.SUCCESS)
+# create the plugin from bsz_gimp_lib
+plugin = PlugIn(
+    "Star sparkles",  # name
+    create_sparkles,
+    ParamString("Layer name", "sparkles"),
+    ParamNumber("FWMH", 1, 1, 30, ui_step=0.5),
+    ParamNumber("Count", 50, 10, 2000, ui_step=10),
+    ParamNumber("Angle", 30, 0, 180, ui_step=5),
+    ParamNumber("Size", 100, 10, 1000, ui_step=5),
+    description="Add star sparkles",
+    images="RGB*, GRAY*",
+    path = "<Image>/Astro/",
+    authors = "François Guillemé",
+    date = "2022"
+)
 
-    return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
-
-_color = Gimp.RGB()
-_color.set(240.0, 0, 0)
-
-class Sparkles (Gimp.PlugIn):
-    ## Parameters ##
-    __gproperties__ = {
-        "name": (str,
-                 _("Layer _name"),
-                 _("Layer name"),
-                 _("Sparkles"),
-                 GObject.ParamFlags.READWRITE),
-        "fwhm": (float,
-                       _("FWHM"),
-                       _("fwhm"),
-                       1.0, 7.0, 2.0,
-                       GObject.ParamFlags.READWRITE),
-        "count": (int,
-                    _("Count"),
-                    _("count"),
-                    1, 100, 10,
-                    GObject.ParamFlags.READWRITE),
-        "angle": (int,
-                    _("Angle"),
-                    _("angle"),
-                    1, 360, 10,
-                    GObject.ParamFlags.READWRITE),
-        "size": (int,
-                    _("Size"),
-                    _("size"),
-                    10, 1000, 100,
-                    GObject.ParamFlags.READWRITE),
-    }
-    ## GimpPlugIn virtual methods ##
-    def do_set_i18n(self, procname):
-        return True, 'gimp30-python', None
-
-    def do_query_procedures(self):
-        return [ 'astro-star-sparkles' ]
-
-    def do_create_procedure(self, name):
-        procedure = Gimp.ImageProcedure.new(self, name,
-                                            Gimp.PDBProcType.PLUGIN,
-                                           create_sparkles, None)
-        procedure.set_image_types("RGB*, GRAY*");
-        procedure.set_sensitivity_mask (Gimp.ProcedureSensitivityMask.DRAWABLE |
-                                        Gimp.ProcedureSensitivityMask.DRAWABLES)
-        procedure.set_documentation (_("Add a layer of star sparkles"),
-                                     _("Adds a layer of star sparkles"),
-                                     name)
-        procedure.set_menu_label(_("_Star sparkles"))
-        procedure.set_attribution("F. Guillemé",
-                                  "F. Guillemé",
-                                  "2022")
-        procedure.add_menu_path ("<Image>/Astro")
-
-        procedure.add_argument_from_property(self, "name")
-        procedure.add_argument_from_property(self, "fwhm")
-        procedure.add_argument_from_property(self, "count")
-        procedure.add_argument_from_property(self, "angle")
-        procedure.add_argument_from_property(self, "size")
-        return procedure
-
-Gimp.main(Sparkles.__gtype__, sys.argv)
+Gimp.main(plugin.Procedure.__gtype__, sys.argv)
