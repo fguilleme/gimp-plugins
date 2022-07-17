@@ -12,7 +12,7 @@ from astropy.stats import sigma_clipped_stats
 from photutils.detection import DAOStarFinder
 from photutils.detection import find_peaks
 
-def detect_stars(path, count=20, fwhm=3.0, th=5.0, sigma=3, fast=True):
+def detect_stars(path, count=20, fwhm=3.0, th=5.0, sigma=3):
     image = Image.open(path).convert('L')
     data = np.asarray(image)
 
