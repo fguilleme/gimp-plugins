@@ -5,21 +5,17 @@ import gi
 gi.require_version('Gimp', '3.0')
 from gi.repository import Gimp
 gi.require_version('GimpUi', '3.0')
-from gi.repository import GimpUi
 from gi.repository import GObject
-from gi.repository import GLib
 from gi.repository import Gio
-import time
 import sys, os
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/../')
-from bsz_gimp_lib import PlugIn, ParamCombo, ParamString, ParamNumber, ParamBool
+from bsz_gimp_lib import PlugIn, ParamString, ParamNumber
 
 from sparkles import *
 
 @timeit
-def save_image(image, drawable, file_path):
-    interlace, compression = 0, 0
+def save_image(image, drawable, path):
     Gimp.get_pdb().run_procedure(
         "file-png-save",
         [
@@ -31,10 +27,10 @@ def save_image(image, drawable, file_path):
             ),
             GObject.Value(
                 Gio.File,
-                Gio.File.new_for_path(file_path),
+                Gio.File.new_for_path(path),
             ),
-            GObject.Value(GObject.TYPE_BOOLEAN, interlace),
-            GObject.Value(GObject.TYPE_INT, compression),
+            GObject.Value(GObject.TYPE_BOOLEAN, False),
+            GObject.Value(GObject.TYPE_INT, False),
 
             GObject.Value(GObject.TYPE_BOOLEAN, True),
             GObject.Value(GObject.TYPE_BOOLEAN, True),
@@ -44,7 +40,7 @@ def save_image(image, drawable, file_path):
     )
 
 @timeit
-def create_sparkles(image, drawable, name, count, size1, size2, angle):
+def create_sparkles(image, _, name, count, size1, size2, angle):
     # Gimp.context_push()
     image.undo_group_start()
     Gimp.progress_init('Detect stars...')
@@ -78,6 +74,7 @@ def create_sparkles(image, drawable, name, count, size1, size2, angle):
         Gimp.progress_pulse()
         bsize =  size1 + (size2 - size1)  * flux
         opacity = min(100, max(5, round(100*flux)))
+        # Gimp.context_set_brush('sparkle')
         Gimp.context_set_brush_size(bsize)
         Gimp.context_set_opacity(opacity)
         Gimp.context_set_paint_mode(Gimp.LayerMode.NORMAL)
