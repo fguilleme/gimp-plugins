@@ -92,7 +92,7 @@ def create_sparkles(image, drawable, name, count, size1, size2, angle):
         _color = Gimp.RGB()
         _color.set(rgb[0], rgb[1], rgb[2])
         Gimp.context_set_foreground(_color)
-        # Gimp.paintbrush_default(sparkles, [x, y])
+        Gimp.paintbrush_default(sparkles, [x, y])
 
     Gimp.displays_flush()
 
