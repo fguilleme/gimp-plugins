@@ -1,6 +1,8 @@
 GIMP 2.99 python plugin to add a layer for star sparkles.
 
-It requires numpy, PIL, astropy and  phoutils python modules to be installed
+It requires numpy, PIL, sep, astropy and  phoutils python modules to be installed.
+
+As GIMP is probly installed in flatpak, it requires to install those python modules through flatpak.
 
 Basically it detects stars in a current images draw on stroke withe current brush with the size
 and opacity relative the star flux.
