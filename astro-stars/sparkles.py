@@ -23,7 +23,7 @@ def timeit(func):
 
 @timeit
 def detect_stars(path, count):
-    image = Image.open(path).convert('L')
+    image = Image.open(path).convert('L').point( lambda p: 255 if p > 100 else 0 )
     data = np.asarray(image).copy().astype(np.float64)
 
     # m, s = np.mean(data), np.std(data)
